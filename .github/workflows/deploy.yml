@@ -1,9 +1,11 @@
 name: Deploy Infrastructure and Apps
 
+# should trigger on push to main branch or manually
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   terraform:
