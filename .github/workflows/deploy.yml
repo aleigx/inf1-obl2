@@ -1,6 +1,5 @@
 name: Deploy Infrastructure and Apps
 
-# should trigger on push to main branch or manually
 on:
   push:
     branches:
@@ -12,8 +11,10 @@ jobs:
     name: Terraform Apply
     runs-on: ubuntu-latest
     outputs:
-      bucket_name: ${{ steps.exports.outputs.BUCKET_NAME }}
+      static_site_bucket_name: ${{ steps.exports.outputs.STATIC_SITE_BUCKET_NAME }}
       region: ${{ steps.exports.outputs.REGION }}
+      ecr_repository_url: ${{ steps.exports.outputs.ECR_REPOSITORY_URL }}
+      ec2_instance_ids: ${{ steps.exports.outputs.EC2_INSTANCE_IDS }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,12 +31,27 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
 
+      - name: Create .ssh directory
+        run: mkdir -p $HOME/.ssh
+        shell: bash
+
+      - name: Copy public key to create key pair
+        run: echo "${{ secrets.PUBLIC_KEY }}" > $HOME/.ssh/inf1-ob2-key.pub
+        shell: bash
+
+      - name: Copy private key
+        run: echo "${{ secrets.PRIVATE_KEY }}" > $HOME/.ssh/inf1-ob2-key.pem
+        shell: bash
+
       - name: Terraform Init
         run: terraform init
         working-directory: ./terraform
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        run: |
+          export TF_VAR_public_key_path=$HOME/.ssh/inf1-ob2-key.pub
+          export TF_VAR_private_key_path=$HOME/.ssh/inf1-ob2-key.pem
+          terraform apply -auto-approve
         working-directory: ./terraform
         id: terraform-apply
 
@@ -43,8 +59,10 @@ jobs:
         id: exports
         working-directory: ./terraform
         run: |
-          echo "BUCKET_NAME=$(terraform output -raw bucket_name)" >> $GITHUB_OUTPUT
+          echo "STATIC_SITE_BUCKET_NAME=$(terraform output -raw static_site_bucket_name)" >> $GITHUB_OUTPUT
           echo "REGION=$(terraform output -raw region)" >> $GITHUB_OUTPUT
+          echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
+          echo "EC2_INSTANCE_IDS=$(terraform output -raw ec2_instance_ids)" >> $GITHUB_OUTPUT
 
   build_and_deploy_react_app:
     needs: terraform
@@ -75,5 +93,47 @@ jobs:
           aws-region: ${{ needs.terraform.outputs.region }}
 
       - name: Deploy to S3
-        run: aws s3 sync --delete build s3://${{ needs.terraform.outputs.bucket_name }}/
+        run: aws s3 sync --delete build s3://${{ needs.terraform.outputs.static_site_bucket_name }}/
         working-directory: ./apps/web-app
+      
+  build_and_deploy_node_api:
+    needs: terraform
+    name: Build and Deploy Node API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ needs.terraform.outputs.region }}
+
+      - name: Login to ECR
+        run: aws ecr get-login-password --region ${{ needs.terraform.outputs.region }} | docker login --username AWS --password-stdin ${{ needs.terraform.outputs.ecr_repository_url }}
+
+      - name: Build Docker Image
+        run: docker build -t ${{ needs.terraform.outputs.ecr_repository_url }} .
+        working-directory: ./apps/api
+
+      - name: Push Docker Image
+        run: docker push ${{ needs.terraform.outputs.ecr_repository_url }}
+        working-directory: ./apps/api
+
+      - name: Retrieve EC2 Instance IPs
+        id: get_ec2_ips
+        run: |
+          aws ec2 describe-instances --instance-ids ${{ needs.terraform.outputs.ec2_instance_ids }} \
+            --query 'Reservations[*].Instances[*].PublicIpAddress' --output text > ec2_ips.txt
+        shell: bash
+
+      - name: Deploy to all EC2 instances
+        run: |
+          for ip in $(cat ec2_ips.txt); do
+            echo "Deploying to $ip"
+            ssh -i $HOME/.ssh/inf1-ob2-key.pem ec2-user@$ip "docker pull ${{ needs.terraform.outputs.ecr_repository_url }}"
+            ssh -i $HOME/.ssh/inf1-ob2-key.pem ec2-user@$ip "docker run -d -p 80:3000 ${{ needs.terraform.outputs.ecr_repository_url }}"
+          done
+        shell: bash

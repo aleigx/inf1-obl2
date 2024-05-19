@@ -1,4 +1,18 @@
 {
-    "bucket_name": "web-app-inf1-ob2",
-    "region": "us-west-2"
+    "static_site_bucket_name": "web-app-inf1-ob2",
+    "orders_bucket_name": "orders-inf1-ob2",
+    "files_bucket_name": "files-inf1-ob2",
+    "notifications_queue_name": "notifications-inf1-ob2",
+    "ec2_instance_type": "t2.micro",
+    "ec2_instance_count": 2,
+    "ec2_ami_id": "ami-01cd4de4363ab6ee8",
+    "lb_name": "lb-inf1-ob2",
+    "target_group_name": "tg-inf1-ob2",
+    "region": "us-west-2",
+    "availability_zones": ["us-west-2a", "us-west-2b"],
+    "vpc_cidr_block": "10.0.0.0/24",
+    "public_subnet_cidr_blocks": ["10.0.0.0/26", "10.0.0.64/26"],
+    "private_subnet_cidr_blocks": ["10.0.0.128/26", "10.0.0.192/26"],
+    "key_name": "inf1-ob2-key",
+    "ecr_name": "api-inf1-ob2"
 }
