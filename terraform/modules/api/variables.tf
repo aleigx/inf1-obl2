@@ -43,12 +43,22 @@ variable "key_name" {
   type        = string
 }
 
-variable "public_subnet_cidr_blocks" {
-  description = "The CIDR blocks for the public subnets"
+variable "ec2_subnet_cidr_blocks" {
+  description = "The CIDR blocks for the EC2 instances"
   type        = list(string)
 }
 
-variable "private_subnet_cidr_blocks" {
-  description = "The CIDR blocks for the private subnets"
+variable "lb_subnet_cidr_blocks" {
+  description = "The CIDR blocks for the load balancer"
   type        = list(string)
+}
+
+variable "vpc_cidr_block" {
+  description = "The CIDR block for the VPC"
+  type        = string
+}
+
+variable "repository_arn" {
+  description = "The ARN of the ECR repository"
+  type        = string
 }

@@ -39,10 +39,6 @@ jobs:
         run: echo "${{ secrets.PUBLIC_KEY }}" > $HOME/.ssh/inf1-ob2-key.pub
         shell: bash
 
-      - name: Copy private key
-        run: echo "${{ secrets.PRIVATE_KEY }}" > $HOME/.ssh/inf1-ob2-key.pem
-        shell: bash
-
       - name: Terraform Init
         run: terraform init
         working-directory: ./terraform
@@ -62,7 +58,7 @@ jobs:
           echo "STATIC_SITE_BUCKET_NAME=$(terraform output -raw static_site_bucket_name)" >> $GITHUB_OUTPUT
           echo "REGION=$(terraform output -raw region)" >> $GITHUB_OUTPUT
           echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
-          echo "EC2_INSTANCE_IDS=$(terraform output -raw ec2_instance_ids)" >> $GITHUB_OUTPUT
+          echo "EC2_INSTANCE_IDS=$(terraform output -json ec2_instance_ids)" >> $GITHUB_OUTPUT
 
   build_and_deploy_react_app:
     needs: terraform
@@ -95,10 +91,10 @@ jobs:
       - name: Deploy to S3
         run: aws s3 sync --delete build s3://${{ needs.terraform.outputs.static_site_bucket_name }}/
         working-directory: ./apps/web-app
-      
-  build_and_deploy_node_api:
+
+  build_api_image:
     needs: terraform
-    name: Build and Deploy Node API
+    name: Build API Image
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -122,18 +118,8 @@ jobs:
         run: docker push ${{ needs.terraform.outputs.ecr_repository_url }}
         working-directory: ./apps/api
 
-      - name: Retrieve EC2 Instance IPs
-        id: get_ec2_ips
+      - name: Deploy API
         run: |
-          aws ec2 describe-instances --instance-ids ${{ needs.terraform.outputs.ec2_instance_ids }} \
-            --query 'Reservations[*].Instances[*].PublicIpAddress' --output text > ec2_ips.txt
-        shell: bash
+          aws ssm send-command --document-name "AWS-RunShellScript" --instance-ids ${{ toJSON(needs.terraform.outputs.ec2_instance_ids) }} --parameters commands=["docker pull ${{ needs.terraform.outputs.ecr_repository_url }}","docker run -d -p 80:3000 ${{ needs.terraform.outputs.ecr_repository_url }}"] --timeout-seconds 600 --max-concurrency "50" --max-errors "0"
 
-      - name: Deploy to all EC2 instances
-        run: |
-          for ip in $(cat ec2_ips.txt); do
-            echo "Deploying to $ip"
-            ssh -i $HOME/.ssh/inf1-ob2-key.pem ec2-user@$ip "docker pull ${{ needs.terraform.outputs.ecr_repository_url }}"
-            ssh -i $HOME/.ssh/inf1-ob2-key.pem ec2-user@$ip "docker run -d -p 80:3000 ${{ needs.terraform.outputs.ecr_repository_url }}"
-          done
-        shell: bash
+      

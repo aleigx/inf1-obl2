@@ -40,3 +40,8 @@ output "ecr_repository_url" {
   description = "The URL of the ECR repository"
   value       = module.ecr.ecr_url
 }
+
+output "ec2_instance_ipv6s" {
+  description = "The IPv6 addresses of the EC2 instances"
+  value       = module.api.ipv6s
+}

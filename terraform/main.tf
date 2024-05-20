@@ -55,6 +55,8 @@ module "api" {
   lb_name = local.vars.lb_name
   availability_zones = local.vars.availability_zones
   key_name = module.keypair.key_name
-  public_subnet_cidr_blocks = local.vars.public_subnet_cidr_blocks
-  private_subnet_cidr_blocks = local.vars.private_subnet_cidr_blocks
+  vpc_cidr_block = local.vars.vpc_cidr_block
+  lb_subnet_cidr_blocks = local.vars.lb_subnet_cidr_blocks
+  ec2_subnet_cidr_blocks = local.vars.ec2_subnet_cidr_blocks
+  repository_arn = module.ecr.ecr_arn
 }
