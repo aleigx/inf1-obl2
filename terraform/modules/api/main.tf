@@ -1,6 +1,10 @@
 resource "aws_vpc" "vpc" {
   cidr_block = var.vpc_cidr_block
-  assign_generated_ipv6_cidr_block = true
+  enable_dns_support = true
+  enable_dns_hostnames = true
+  tags = {
+    Name = "vpc"
+  }
 }
 
 #subnets
@@ -10,7 +14,6 @@ resource "aws_subnet" "lb_subnets" {
   vpc_id            = aws_vpc.vpc.id
   cidr_block = element(var.lb_subnet_cidr_blocks, count.index)
   availability_zone = var.availability_zones[count.index]
-  ipv6_cidr_block      = cidrsubnet(aws_vpc.vpc.ipv6_cidr_block, 8, count.index)
 }
 
 resource "aws_subnet" "ec2_subnets" {
@@ -18,269 +21,310 @@ resource "aws_subnet" "ec2_subnets" {
   vpc_id            = aws_vpc.vpc.id
   cidr_block = element(var.ec2_subnet_cidr_blocks, count.index)
   availability_zone = var.availability_zones[count.index]
-  ipv6_cidr_block      = cidrsubnet(aws_vpc.vpc.ipv6_cidr_block, 8, count.index + length(var.lb_subnet_cidr_blocks))
 }
 
-#routing table
-
-resource "aws_route_table" "internet" {
-  vpc_id = aws_vpc.vpc.id
-}
-
-resource "aws_route" "internet_route" {
-  route_table_id         = aws_route_table.internet.id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.igw.id
-}
-
-resource "aws_route" "internet_route_ipv6" {
-  route_table_id         = aws_route_table.internet.id
-  destination_ipv6_cidr_block = "::/0"
-  gateway_id             = aws_internet_gateway.igw.id
-}
-
-
-resource "aws_route_table_association" "lb_subnets_association" {
-  count          = length(aws_subnet.lb_subnets)
-  subnet_id      = element(aws_subnet.lb_subnets.*.id, count.index)
-  route_table_id = aws_route_table.internet.id
-}
-
-
-resource "aws_route_table_association" "ec2_subnets_association" {
-  count          = length(aws_subnet.ec2_subnets)
-  subnet_id      = element(aws_subnet.ec2_subnets.*.id, count.index)
-  route_table_id = aws_route_table.internet.id
-}
-
+#internet gateway
 
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.vpc.id
 }
 
-#security groups
+#public route table
 
-resource "aws_security_group" "ec2_instance" {
-  name        = "App-IN-SG"
-  description = "Allow inbound and outbound traffic to EC2 instances from load balancer security group."
-
-  ingress {
-    from_port       = 80
-    to_port         = 80
-    protocol        = "tcp"
-    security_groups = [aws_security_group.lb.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
+resource "aws_route_table" "public" {
   vpc_id = aws_vpc.vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    Name = "public"
+  }
+
 }
 
-resource "aws_security_group" "ssh_ipv6" {
-  name        = "SSH-IPv6"
-  description = "Allow SSH access from the internet."
+#private route table
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.vpc.id
+
+  tags = {
+    Name = "private"
+  }
+}
+
+#associate public route table with public subnets
+
+resource "aws_route_table_association" "public" {
+  count = length(aws_subnet.lb_subnets)
+  subnet_id      = aws_subnet.lb_subnets[count.index].id
+  route_table_id = aws_route_table.public.id
+}
+
+
+#associate private route table with private subnets
+
+resource "aws_route_table_association" "private" {
+  count = length(aws_subnet.ec2_subnets)
+  subnet_id      = aws_subnet.ec2_subnets[count.index].id
+  route_table_id = aws_route_table.private.id
+}
+
+#security group for vpc
+
+resource "aws_security_group" "vpc_endpoint_security_group" {
+  name_prefix = "vpc-endpoint-sg"
+  vpc_id      = aws_vpc.vpc.id
+  description = "security group for VPC Endpoints"
+
   ingress {
-    from_port   = 22
-    to_port     = 22
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
-    ipv6_cidr_blocks = ["::/0"]
+    cidr_blocks = [aws_vpc.vpc.cidr_block]
+    description = "Allow HTTPS traffic from VPC"
   }
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    ipv6_cidr_blocks = ["::/0"]
+
+  tags = {
+    Name = "VPC Endpoint security group"
   }
-  vpc_id = aws_vpc.vpc.id
 }
 
-resource "aws_security_group" "lb" {
-  name        = "App-LB-SG"
-  description = "Allow inbound and outbound traffic to load balancer from the internet."
+#vpc endpoints for ssm
+
+resource "aws_vpc_endpoint" "ssm" {
+  vpc_id = aws_vpc.vpc.id
+  service_name = "com.amazonaws.${var.region}.ssm"
+  vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
+  security_group_ids = [aws_security_group.vpc_endpoint_security_group.id]
+  subnet_ids = [aws_subnet.ec2_subnets[0].id]
+}
+
+resource "aws_vpc_endpoint" "ssm_messages" {
+  vpc_id = aws_vpc.vpc.id
+  service_name = "com.amazonaws.${var.region}.ssmmessages"
+  vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
+  security_group_ids = [aws_security_group.vpc_endpoint_security_group.id]
+  subnet_ids = [aws_subnet.ec2_subnets[0].id]
+}
+
+resource "aws_vpc_endpoint" "ec2messages" {
+  vpc_id = aws_vpc.vpc.id
+  service_name = "com.amazonaws.${var.region}.ec2messages"
+  vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
+  security_group_ids = [aws_security_group.vpc_endpoint_security_group.id]
+  subnet_ids = [aws_subnet.ec2_subnets[0].id]
+}
+
+# vpc endpoints for ecr and s3
+
+# VPC Endpoint (ecr.dkr)
+resource "aws_vpc_endpoint" "ecr_dkr" {
+  vpc_id              = aws_vpc.vpc.id
+  service_name        = "com.amazonaws.${var.region}.ecr.dkr"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+
+  security_group_ids = [aws_security_group.vpc_endpoint_security_group.id]
+  subnet_ids         = [aws_subnet.ec2_subnets[0].id]
+
+}
+
+# VPC Endpoint (ecr.api)
+resource "aws_vpc_endpoint" "ecr_api" {
+  vpc_id              = aws_vpc.vpc.id
+  service_name        = "com.amazonaws.${var.region}.ecr.api"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+
+  security_group_ids = [aws_security_group.vpc_endpoint_security_group.id]
+  subnet_ids         = [aws_subnet.ec2_subnets[0].id]
+
+}
+
+# VPC Endpoint (s3)
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.vpc.id
+  service_name      = "com.amazonaws.${var.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids = [aws_route_table.private.id]
+}
+
+# security group for ec2 instances
+
+resource "aws_security_group" "instance_security_group" {
+  name_prefix = "instance-sg"
+  vpc_id      = aws_vpc.vpc.id
+  description = "security group for the EC2 instance"
+
+  # Allow outbound HTTPS traffic
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow HTTPS outbound traffic"
+  }
+
+  tags = {
+    Name = "EC2 Instance security group"
+  }
+}
+
+
+# Create IAM role for EC2 instance
+
+resource "aws_iam_role" "ec2_role" {
+  name = "ec2_role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        },
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+# Attach AmazonSSMManagedInstanceCore policy to the IAM role
+resource "aws_iam_role_policy_attachment" "ec2_role_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  role       = aws_iam_role.ec2_role.name
+}
+
+# ECR Full Access policy 
+
+resource "aws_iam_role_policy_attachment" "ecr_full_access" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
+  role       = aws_iam_role.ec2_role.name
+}
+
+# Create an instance profile for the EC2 instance and associate the IAM role
+resource "aws_iam_instance_profile" "ec2_instance_profile" {
+  name = "EC2_SSM_Instance_Profile"
+  role = aws_iam_role.ec2_role.name
+}
+
+# security group for load balancer
+
+resource "aws_security_group" "lb_security_group" {
+  name        = "load_balancer_security_group"
+  description = "Controls access to the ALB"
+  vpc_id      = aws_vpc.vpc.id
+
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  vpc_id = aws_vpc.vpc.id
+ 
 }
 
+# security group for ec2 regarding load balancer
 
-data aws_iam_policy_document "ec2_assume_role" {
-  statement {
-    actions = ["sts:AssumeRole"]
+resource "aws_security_group" "ec2_lb_security_group" {
+  name        = "ec2_lb_security_group"
+  description = "Controls access to the EC2 instances from the load balancer"
+  vpc_id      = aws_vpc.vpc.id
 
-    principals {
-      type        = "Service"
-      identifiers = ["ec2.amazonaws.com"]
-    }
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    security_groups = [aws_security_group.lb_security_group.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
-resource "aws_iam_role" "ec2_iam_role" {
-  name = "ec2_iam_role"
-  assume_role_policy = "${data.aws_iam_policy_document.ec2_assume_role.json}"
-}
-
-resource "aws_iam_instance_profile" "instance_profile" {
-  name = "instance_profile"
-  role = "${aws_iam_role.ec2_iam_role.name}"
-}
-
-
-# s3 bucket access
-
-data aws_iam_policy_document "s3_read_access" {
-  statement {
-    actions = ["s3:PutObject"]
-    resources = [var.files_bucket_arn, var.orders_bucket_arn]
-  }
-}
-
-resource "aws_iam_role_policy" "join_policy" {
-  depends_on = [aws_iam_role.ec2_iam_role]
-  name       = "join_policy"
-  role       = "${aws_iam_role.ec2_iam_role.name}"
-  policy = "${data.aws_iam_policy_document.s3_read_access.json}"
-}
-
-# sqs access, read, write, delete
-
-data aws_iam_policy_document "sqs_access" {
-  statement {
-    actions = ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage"]
-    resources = [var.queue_arn]
-  }
-}
-
-resource "aws_iam_role_policy" "sqs_policy" {
-  depends_on = [aws_iam_role.ec2_iam_role]
-  name = "sqs_policy"
-  role = aws_iam_role.ec2_iam_role.name
-  policy = data.aws_iam_policy_document.sqs_access.json
-}
-
-# ecr
-
-data aws_iam_policy_document "ecr_access" {
-  statement {
-    actions = ["*"]
-    resources = [var.repository_arn]
-  }
-}
-
-resource "aws_iam_role_policy" "ecr_policy" {
-  depends_on = [aws_iam_role.ec2_iam_role]
-  name = "ecr_policy"
-  role = aws_iam_role.ec2_iam_role.name
-  policy = data.aws_iam_policy_document.ecr_access.json
-}
-
-
-# instances
-
-
+# create ec2 instances
 
 resource "aws_instance" "app" {
-  count           = var.instance_count
-  ami             = var.ami_id
-  instance_type   = var.instance_type
-  subnet_id       = element(aws_subnet.ec2_subnets.*.id, count.index % length(aws_subnet.ec2_subnets))
-  key_name        = var.key_name
-  vpc_security_group_ids = [aws_security_group.ec2_instance.id, aws_security_group.ssh_ipv6.id]
-  ipv6_address_count = 1
+  count = var.instance_count
+  ami = var.ami_id
+  instance_type = var.instance_type
+  subnet_id = element(aws_subnet.ec2_subnets[*].id, count.index % length(aws_subnet.ec2_subnets))
+  vpc_security_group_ids = [aws_security_group.instance_security_group.id, aws_security_group.ec2_lb_security_group.id]
+  iam_instance_profile = aws_iam_instance_profile.ec2_instance_profile.name
   tags = {
-    Name = "api-instance-${count.index + 1}"
+    Name = "app"
   }
-
-  iam_instance_profile = "${aws_iam_instance_profile.instance_profile.name}"
-
-
 
   user_data = <<-EOF
-    #!/bin/bash
-    set -ex
-    sudo yum update -y
-    sudo yum install -y docker
-    sudo service docker start
-    sudo usermod -a -G docker ec2-user
+              #!/bin/bash
+              sudo yum update -y
+              sudo yum install -y docker
+              sudo service docker start
+              sudo usermod -a -G docker ec2-user
 
-    cat << 'EOT' > /etc/systemd/system/app.service
-    [Unit]
-    Description=app
-    After=docker.service
-    Requires=docker.service
-
-    [Service]
-    Restart=always
-    ExecStart=/usr/bin/docker pull ${var.repository_url}:latest
-    ExecStart=/usr/bin/docker run -p 80:80 ${var.repository_url}:latest
-
-    [Install]
-    WantedBy=multi-user.target
-    EOT
-
-    sudo systemctl daemon-reload
-    sudo systemctl enable app
-    sudo systemctl start app
-  EOF
+              #login
+              echo "aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${var.repository_url}" > /etc/deploy.sh
+              echo "docker pull ${var.repository_url}:latest" >> /etc/deploy.sh
+              echo "docker run -d -p 80:3000 ${var.repository_url}:latest" >> /etc/deploy.sh
+          
+              chmod +x /etc/deploy.sh
+            EOF
 }
 
-# load balancer
+# create load balancer
 
-resource "aws_lb_target_group" "lb_target_group" {
-  name     = "lb-target-group"
+resource "aws_lb" "lb" {
+  name               = var.lb_name
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.lb_security_group.id]
+  subnets            = aws_subnet.lb_subnets[*].id
+}
+
+# create target group
+
+resource "aws_lb_target_group" "target_group" {
+  name     = "target-group"
   port     = 80
   protocol = "HTTP"
-  vpc_id   = aws_vpc.vpc.id
-  health_check {
-    enabled             = true
-    healthy_threshold   = 3
-    interval            = 10
-    matcher             = 200
-    path                = "/health"
-    port                = "traffic-port"
-    protocol            = "HTTP"
-    timeout             = 3
-    unhealthy_threshold = 2
-  }
+  vpc_id      = aws_vpc.vpc.id
 }
 
-resource "aws_lb_target_group_attachment" "attach_app" {
-  count            = length(aws_instance.app)
-  target_group_arn = aws_lb_target_group.lb_target_group.arn
-  target_id        = element(aws_instance.app.*.id, count.index)
-  port             = 80
-}
+#  create listener
 
-resource "aws_lb_listener" "lb_listener" {
+resource "aws_lb_listener" "listener" {
   load_balancer_arn = aws_lb.lb.arn
   port              = "80"
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.lb_target_group.arn
+    target_group_arn = aws_lb_target_group.target_group.arn
   }
 }
 
-resource "aws_lb" "lb" {
-  name                       = "app-lb"
-  internal                   = false
-  load_balancer_type         = "application"
-  security_groups            = [aws_security_group.lb.id]
-  subnets                    = [for subnet in aws_subnet.lb_subnets : subnet.id]
-  enable_deletion_protection = false
+# create target group attachment
+
+resource "aws_lb_target_group_attachment" "target_group_attachment" {
+  count            = var.instance_count
+  target_group_arn = aws_lb_target_group.target_group.arn
+  target_id        = aws_instance.app[count.index].id
+  port             = 80
 }

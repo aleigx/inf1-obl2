@@ -4,7 +4,7 @@ variable "variables_file" {
   default     = ""
 }
 
-variable "public_key_path" {
-  description = "Path to the public SSH key"
-  type        = string
-}
+#variable "public_key_path" {
+#  description = "Path to the public SSH key"
+#  type        = string
+#}
