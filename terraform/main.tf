@@ -11,17 +11,17 @@ module "ecr" {
   ecr_name = local.vars.ecr_name
 }
 
-#module "static_site" {
-#  source = "./modules/bucket"
-#  bucket_name = local.vars.static_site_bucket_name
-#}
-#
-#module "cloudfront" {
-#  source = "./modules/cloudfront"
-#  bucket_name = module.static_site.bucket_name
-#  bucket_arn = module.static_site.arn
-#  bucket_regional_domain_name = module.static_site.bucket_regional_domain_name
-#}
+module "static_site" {
+  source = "./modules/bucket"
+  bucket_name = local.vars.static_site_bucket_name
+}
+
+module "cloudfront" {
+  source = "./modules/cloudfront"
+  bucket_name = module.static_site.bucket_name
+  bucket_arn = module.static_site.arn
+  bucket_regional_domain_name = module.static_site.bucket_regional_domain_name
+}
 
 module "orders_bucket" {
   source = "./modules/bucket"
