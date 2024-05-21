@@ -62,3 +62,13 @@ variable "repository_arn" {
   description = "The ARN of the ECR repository"
   type        = string
 }
+
+variable "repository_url" {
+  description = "The URL of the ECR repository"
+  type        = string
+}
+
+variable "region" {
+  description = "The region to deploy the resources"
+  type        = string
+}

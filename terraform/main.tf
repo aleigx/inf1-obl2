@@ -59,4 +59,6 @@ module "api" {
   lb_subnet_cidr_blocks = local.vars.lb_subnet_cidr_blocks
   ec2_subnet_cidr_blocks = local.vars.ec2_subnet_cidr_blocks
   repository_arn = module.ecr.ecr_arn
+  repository_url = module.ecr.ecr_url
+  region = local.vars.region
 }

@@ -118,8 +118,20 @@ jobs:
         run: docker push ${{ needs.terraform.outputs.ecr_repository_url }}
         working-directory: ./apps/api
 
-      - name: Deploy API
-        run: |
-          aws ssm send-command --document-name "AWS-RunShellScript" --instance-ids ${{ toJSON(needs.terraform.outputs.ec2_instance_ids) }} --parameters commands=["docker pull ${{ needs.terraform.outputs.ecr_repository_url }}","docker run -d -p 80:3000 ${{ needs.terraform.outputs.ecr_repository_url }}"] --timeout-seconds 600 --max-concurrency "50" --max-errors "0"
+  Restart_EC2_instance:
+    needs: [terraform, build_api_image]
+    name: Restart EC2 Instance
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        instance_id: ${{ fromJson(needs.terraform.outputs.ec2_instance_ids) }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ needs.terraform.outputs.region }}
 
-      
+      - name: Restart EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ matrix.instance_id }}

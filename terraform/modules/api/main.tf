@@ -191,6 +191,8 @@ resource "aws_iam_role_policy" "ecr_policy" {
 
 # instances
 
+
+
 resource "aws_instance" "app" {
   count           = var.instance_count
   ami             = var.ami_id
@@ -205,6 +207,8 @@ resource "aws_instance" "app" {
 
   iam_instance_profile = "${aws_iam_instance_profile.instance_profile.name}"
 
+
+
   user_data = <<-EOF
     #!/bin/bash
     set -ex
@@ -212,9 +216,25 @@ resource "aws_instance" "app" {
     sudo yum install -y docker
     sudo service docker start
     sudo usermod -a -G docker ec2-user
-    sudo yum install -y amazon-ssm-agent
-    sudo systemctl enable amazon-ssm-agent
-    sudo systemctl start amazon-ssm-agent
+
+    cat << 'EOT' > /etc/systemd/system/app.service
+    [Unit]
+    Description=app
+    After=docker.service
+    Requires=docker.service
+
+    [Service]
+    Restart=always
+    ExecStart=/usr/bin/docker pull ${var.repository_url}:latest
+    ExecStart=/usr/bin/docker run -p 80:80 ${var.repository_url}:latest
+
+    [Install]
+    WantedBy=multi-user.target
+    EOT
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable app
+    sudo systemctl start app
   EOF
 }
 
