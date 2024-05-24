@@ -15,9 +15,6 @@ jobs:
       region: ${{ steps.exports.outputs.REGION }}
       ecr_repository_url: ${{ steps.exports.outputs.ECR_REPOSITORY_URL }}
       ec2_instance_ids: ${{ steps.exports.outputs.EC2_INSTANCE_IDS }}
-      sqs_queue_url: ${{ steps.exports.outputs.SQS_QUEUE_URL }}
-      bucket_files: ${{ steps.exports.outputs.BUCKET_FILES }}
-      bucket_orders: ${{ steps.exports.outputs.BUCKET_ORDERS }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -62,9 +59,6 @@ jobs:
           echo "REGION=$(terraform output -raw region)" >> $GITHUB_OUTPUT
           echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
           echo "EC2_INSTANCE_IDS=$(terraform output -json ec2_instance_ids)" >> $GITHUB_OUTPUT
-          echo "SQS_QUEUE_URL=$(terraform output -raw notifications_queue_url)" >> $GITHUB_OUTPUT
-          echo "BUCKET_FILES=$(terraform output -raw bucket_files)" >> $GITHUB_OUTPUT
-          echo "BUCKET_ORDERS=$(terraform output -raw bucket_orders)" >> $GITHUB_OUTPUT
   build_and_deploy_react_app:
     needs: terraform
     name: Build and Deploy React App

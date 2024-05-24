@@ -294,10 +294,8 @@ resource "aws_instance" "app" {
               sudo usermod -a -G docker ec2-user
               aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${var.repository_url}
 
-              #login
               echo "aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${var.repository_url}" > /etc/deploy.sh
               echo "docker pull ${var.repository_url}:latest" >> /etc/deploy.sh
-              # set environment variables for docker
               echo "docker run -d -p 80:3000 ${var.repository_url}:latest -e FILES_BUCKET=${var.bucket_files} -e ORDERS_BUCKET=${var.bucket_orders} -e QUEUE_URL=${var.sqs_queue_url}" >> /etc/deploy.sh
           
               chmod +x /etc/deploy.sh
