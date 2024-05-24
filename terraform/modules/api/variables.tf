@@ -72,3 +72,18 @@ variable "region" {
   description = "The region to deploy the resources"
   type        = string
 }
+
+variable "sqs_queue_url" {
+  description = "The URL of the SQS queue"
+  type        = string
+}
+
+variable "bucket_files" {
+  description = "The name of the files bucket"
+  type        = string
+}
+
+variable "bucket_orders" {
+  description = "The name of the orders bucket"
+  type        = string
+}

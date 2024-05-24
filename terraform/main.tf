@@ -54,4 +54,7 @@ module "api" {
   repository_arn = module.ecr.ecr_arn
   repository_url = module.ecr.ecr_url
   region = local.vars.region
+  sqs_queue_url = module.notifications_queue.url
+  bucket_files = module.files_bucket.bucket_name
+  bucket_orders = module.orders_bucket.bucket_name
 }

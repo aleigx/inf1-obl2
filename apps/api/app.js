@@ -11,9 +11,9 @@ const upload = multer({ storage: multer.memoryStorage() });
 const s3 = new AWS.S3();
 const sqs = new AWS.SQS();
 
-const BUCKET_FILE = process.argv[2];
-const BUCKET_ORDERS = process.argv[3];
-const SQS_QUEUE_URL = process.argv[4];
+const FILES_BUCKET = process.env.FILES_BUCKET;
+const ORDERS_BUCKET = process.env.ORDERS_BUCKET;
+const QUEUE_URL = process.env.QUEUE_URL;
 
 app.get('/health', (req, res) => {
     res.send('Healthy');
@@ -21,7 +21,7 @@ app.get('/health', (req, res) => {
 
 app.post('/upload/file', upload.single('file'), (req, res) => {
     const params = {
-        Bucket: BUCKET_FILE,
+        Bucket: FILES_BUCKET,
         Key: req.file.originalname,
         Body: req.file.buffer,
     };
@@ -43,7 +43,7 @@ app.post('/upload/orders', upload.single('file'), (req, res) => {
     }
 
     const params = {
-        Bucket: BUCKET_ORDERS,
+        Bucket: ORDERS_BUCKET,
         Key: req.file.originalname,
         Body: req.file.buffer,
     };
@@ -56,7 +56,7 @@ app.post('/upload/orders', upload.single('file'), (req, res) => {
 app.post('/notifications', (req, res) => {
     const params = {
         MessageBody: JSON.stringify(req.body),
-        QueueUrl: SQS_QUEUE_URL,
+        QueueUrl: QUEUE_URL,
     };
     sqs.sendMessage(params, (err, data) => {
         if (err) return res.status(500).send(err);
@@ -66,7 +66,7 @@ app.post('/notifications', (req, res) => {
 
 app.get('/notifications', (req, res) => {
     const params = {
-        QueueUrl: SQS_QUEUE_URL,
+        QueueUrl: QUEUE_URL,
         MaxNumberOfMessages: 1,
     };
     sqs.receiveMessage(params, (err, data) => {
