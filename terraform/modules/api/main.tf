@@ -208,6 +208,20 @@ resource "aws_iam_role_policy_attachment" "ecr_full_access" {
   role       = aws_iam_role.ec2_role.name
 }
 
+# SQS Full Access policy
+
+resource "aws_iam_role_policy_attachment" "sqs_full_access" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSQSFullAccess"
+  role       = aws_iam_role.ec2_role.name
+}
+
+# S3 Full Access policy
+
+resource "aws_iam_role_policy_attachment" "s3_full_access" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+  role       = aws_iam_role.ec2_role.name
+}
+
 # Create an instance profile for the EC2 instance and associate the IAM role
 resource "aws_iam_instance_profile" "ec2_instance_profile" {
   name = "EC2_SSM_Instance_Profile"
@@ -306,6 +320,16 @@ resource "aws_lb_target_group" "target_group" {
   port     = 80
   protocol = "HTTP"
   vpc_id      = aws_vpc.vpc.id
+
+  health_check {
+    path                = "/health"
+    protocol            = "HTTP"
+    port                = "80"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
 }
 
 #  create listener
