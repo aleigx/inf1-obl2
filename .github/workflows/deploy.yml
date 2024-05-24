@@ -91,13 +91,10 @@ jobs:
         run: aws s3 sync --delete build s3://${{ needs.terraform.outputs.static_site_bucket_name }}/
         working-directory: ./apps/web-app
 
-  build_and_deploy_api:
+  build_and_push_api:
     needs: terraform
     name: Build API Image and Deploy to EC2 with SSM
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        ec2_instance_ids: ${{ fromJson(needs.terraform.outputs.ec2_instance_ids) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -119,6 +116,21 @@ jobs:
       - name: Push Docker Image
         run: docker push ${{ needs.terraform.outputs.ecr_repository_url }}
         working-directory: ./apps/api
+
+  deploy_api:
+    needs: build_and_push_api
+    name: Deploy API
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ec2_instance_ids: ${{ fromJson(needs.terraform.outputs.ec2_instance_ids) }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ needs.terraform.outputs.region }}
 
       - name: Run /home/ec2-user/app/deploy.sh with SSM
         run: |

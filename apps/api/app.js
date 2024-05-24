@@ -8,15 +8,15 @@ app.use(bodyParser.json());
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-const s3 = new AWS.S3();
-const sqs = new AWS.SQS();
-
 const FILES_BUCKET = process.env.FILES_BUCKET;
 const ORDERS_BUCKET = process.env.ORDERS_BUCKET;
 const QUEUE_URL = process.env.QUEUE_URL;
 const REGION = process.env.REGION;
 
 AWS.config.update({ region: REGION });
+
+const s3 = new AWS.S3();
+const sqs = new AWS.SQS();
 
 app.get('/health', (req, res) => {
     res.send('Healthy');
