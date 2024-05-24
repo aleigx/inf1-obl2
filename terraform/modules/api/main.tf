@@ -301,6 +301,8 @@ resource "aws_instance" "app" {
 
               echo "aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${var.repository_url}" > /etc/deploy.sh
               echo "docker pull ${var.repository_url}:latest" >> /etc/deploy.sh
+              echo "docker stop \$(docker ps -a -q)" >> /etc/deploy.sh
+              echo "docker rm \$(docker ps -a -q)" >> /etc/deploy.sh
               echo "docker run -d --env-file /etc/environment -p 80:3000 ${var.repository_url}:latest" >> /etc/deploy.sh
           
               chmod +x /etc/deploy.sh
