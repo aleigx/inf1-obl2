@@ -297,6 +297,7 @@ resource "aws_instance" "app" {
               echo "QUEUE_URL=${var.sqs_queue_url}" > /etc/environment
               echo "FILES_BUCKET=${var.bucket_files}" >> /etc/environment
               echo "ORDERS_BUCKET=${var.bucket_orders}" >> /etc/environment
+              echo "REGION=${var.region}" >> /etc/environment
 
               echo "aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${var.repository_url}" > /etc/deploy.sh
               echo "docker pull ${var.repository_url}:latest" >> /etc/deploy.sh

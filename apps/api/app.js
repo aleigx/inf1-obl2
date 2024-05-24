@@ -14,6 +14,9 @@ const sqs = new AWS.SQS();
 const FILES_BUCKET = process.env.FILES_BUCKET;
 const ORDERS_BUCKET = process.env.ORDERS_BUCKET;
 const QUEUE_URL = process.env.QUEUE_URL;
+const REGION = process.env.REGION;
+
+AWS.config.update({ region: REGION });
 
 app.get('/health', (req, res) => {
     res.send('Healthy');
