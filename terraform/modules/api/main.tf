@@ -278,6 +278,7 @@ resource "aws_instance" "app" {
               sudo yum install -y docker
               sudo service docker start
               sudo usermod -a -G docker ec2-user
+              aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${var.repository_url}
 
               #login
               echo "aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${var.repository_url}" > /etc/deploy.sh
