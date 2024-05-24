@@ -155,6 +155,17 @@ resource "aws_vpc_endpoint" "s3" {
   route_table_ids = [aws_route_table.private.id]
 }
 
+#VPC Endpoint (sqs)
+
+resource "aws_vpc_endpoint" "sqs" {
+  vpc_id = aws_vpc.vpc.id
+  service_name = "com.amazonaws.${var.region}.sqs"
+  vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
+  security_group_ids = [aws_security_group.vpc_endpoint_security_group.id]
+  subnet_ids = [aws_subnet.ec2_subnets[0].id]
+}
+
 # security group for ec2 instances
 
 resource "aws_security_group" "instance_security_group" {
