@@ -93,7 +93,7 @@ jobs:
 
   build_and_push_api:
     needs: terraform
-    name: Build API Image and Deploy to EC2 with SSM
+    name: Build API Image and push to ECR
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -118,7 +118,7 @@ jobs:
         working-directory: ./apps/api
 
   deploy_api:
-    needs: build_and_push_api
+    needs: [terraform, build_and_push_api]
     name: Deploy API
     runs-on: ubuntu-latest
     strategy:
