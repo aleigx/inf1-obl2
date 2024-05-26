@@ -40,3 +40,7 @@ output "ecr_repository_url" {
   description = "The URL of the ECR repository"
   value       = module.ecr.ecr_url
 }
+
+output "func_name" {
+  value = module.lambda.func_name
+}

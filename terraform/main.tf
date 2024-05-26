@@ -28,6 +28,20 @@ module "orders_bucket" {
   bucket_name = local.vars.orders_bucket_name
 }
 
+module "lambda" {
+  source = "./modules/lambda"
+  function_name = local.vars.lambda_function_name
+  handler = local.vars.lambda_handler
+  runtime = local.vars.lambda_runtime
+}
+
+module "s3-notification" {
+  source = "./modules/s3-notification"
+  bucket_name = module.orders_bucket.bucket_name
+  bucket_arn = module.orders_bucket.arn
+  func_arn = module.lambda.func_arn
+}
+
 module "files_bucket" {
   source = "./modules/bucket"
   bucket_name = local.vars.files_bucket_name
