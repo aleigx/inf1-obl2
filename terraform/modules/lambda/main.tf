@@ -26,10 +26,17 @@ resource "aws_iam_role_policy_attachment" "s3_full_access" {
   role       = aws_iam_role.iam_for_lambda.name
 }
 
+data "archive_file" "lambda_function_payload" {
+  type        = "zip"
+  source_dir  = "${path.root}/../apps/orders-process-func"
+  output_path = "${path.root}/../apps/orders-process-func.zip"
+}
+
 resource "aws_lambda_function" "func" {
-  filename      = "lambda_function_payload.zip"
+  filename      = data.archive_file.lambda_function_payload.output_path
   function_name = var.function_name
   role          = aws_iam_role.iam_for_lambda.arn
   handler       = var.handler
   runtime       = var.runtime
+  source_code_hash = data.archive_file.lambda_function_payload.output_base64sha256
 }

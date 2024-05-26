@@ -24,16 +24,9 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install dependencies
+      - name: Install dependencies lambda func
         run: npm install
         working-directory: ./apps/orders-process-func
-
-      - name: Zip Lambda Function
-        run: zip -r lambda_function_payload.zip .
-        working-directory: ./apps/orders-process-func
-
-      - name: Copy zip file to terraform directory
-        run: cp ./apps/orders-process-func/lambda_function_payload.zip ./terraform
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
