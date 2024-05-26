@@ -26,6 +26,11 @@ resource "aws_iam_role_policy_attachment" "s3_full_access" {
   role       = aws_iam_role.iam_for_lambda.name
 }
 
+resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  role       = aws_iam_role.iam_for_lambda.name
+}
+
 data "archive_file" "lambda_function_payload" {
   type        = "zip"
   source_dir  = "${path.root}/../apps/orders-process-func"

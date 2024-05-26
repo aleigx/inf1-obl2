@@ -35,6 +35,12 @@ module "lambda" {
   runtime = local.vars.lambda_runtime
 }
 
+module "lambda_log_group" {
+  source = "./modules/log-group"
+  log_group_name = "/aws/lambda/${module.lambda.func_name}"
+  log_retention_in_days = local.vars.log_retention_in_days
+}
+
 module "s3-notification" {
   source = "./modules/s3-notification"
   bucket_name = module.orders_bucket.bucket_name
