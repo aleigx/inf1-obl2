@@ -22,7 +22,7 @@ app.get('/health', (req, res) => {
     res.send('Healthy');
 });
 
-app.post('/upload/file', upload.single('file'), (req, res) => {
+app.post('/upload/file', upload.single('file'), async (req, res) => {
     try {
         console.log("Uploading file " + req.file.originalname);
         const params = {
@@ -30,16 +30,14 @@ app.post('/upload/file', upload.single('file'), (req, res) => {
             Key: req.file.originalname,
             Body: req.file.buffer,
         };
-        s3.upload(params, (err, data) => {
-            if (err) return res.status(500).send(err);
-            res.status(200).send(data);
-        });    
+        const data = await s3.upload(params).promise();
+        res.status(200).send(data);
     } catch (err) {
-        return res.status(500).send(err);
+        res.status(500).send(err);
     }
 });
 
-app.post('/upload/orders', upload.single('file'), (req, res) => {
+app.post('/upload/orders', upload.single('file'), async (req, res) => {
     try {
         console.log("Uploading orders " + req.file.originalname);
         if (req.file.mimetype !== 'application/json') {
@@ -51,52 +49,47 @@ app.post('/upload/orders', upload.single('file'), (req, res) => {
             Key: req.file.originalname,
             Body: req.file.buffer,
         };
-        s3.upload(params, (err, data) => {
-            if (err) return res.status(500).send(err);
-            res.status(200).send(data);
-        });
+        const data = await s3.upload(params).promise();
+        res.status(200).send(data);
     } catch (err) {
-        return res.status(500).send(err);
+        res.status(500).send(err);
     }
 });
 
-app.post('/notifications', (req, res) => {
+app.post('/notifications', async (req, res) => {
     try {
         console.log("Sending notification " + JSON.stringify(req.body));
         const params = {
             MessageBody: JSON.stringify(req.body),
             QueueUrl: QUEUE_URL,
         };
-        sqs.sendMessage(params, (err, data) => {
-            if (err) return res.status(500).send(err);
-            res.status(200).send(data);
-        });
+        const data = await sqs.sendMessage(params).promise();
+        res.status(200).send(data);
     } catch (err) {
-        return res.status(500).send(err);
+        res.status(500).send(err);
     }
 });
 
-app.get('/notifications', (req, res) => {
+app.get('/notifications', async (req, res) => {
     try {
         console.log("Receiving notification");
         const params = {
             QueueUrl: QUEUE_URL,
             MaxNumberOfMessages: 1,
         };
-        sqs.receiveMessage(params, (err, data) => {
-            console.log(data);
-            if (err) return res.status(500).send(err);
-            if (!data.Messages || !data.Messages[0]) return res.status(404).send('No messages in the queue');
-            sqs.deleteMessage({
-                QueueUrl: QUEUE_URL,
-                ReceiptHandle: data.Messages[0].ReceiptHandle,
-            }, (err, data) => {
-                if (err) return res.status(500).send(err);
-                res.status(200).send(JSON.parse(data.Messages[0].Body));
-            });
-        });
+        const data = await sqs.receiveMessage(params).promise();
+        console.log(data);
+        if (!data.Messages || !data.Messages[0]) {
+            return res.status(404).send('No messages in the queue');
+        }
+        const deleteParams = {
+            QueueUrl: QUEUE_URL,
+            ReceiptHandle: data.Messages[0].ReceiptHandle,
+        };
+        await sqs.deleteMessage(deleteParams).promise();
+        res.status(200).send(JSON.parse(data.Messages[0].Body));
     } catch (err) {
-        return res.status(500).send(err);
+        res.status(500).send(err);
     }
 });
 
