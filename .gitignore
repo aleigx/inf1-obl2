@@ -3,8 +3,8 @@
 .vscode/
 
 *.pub
-
 *.pem
+*.zip
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

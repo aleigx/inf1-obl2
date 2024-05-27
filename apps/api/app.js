@@ -23,6 +23,7 @@ app.get('/health', (req, res) => {
 });
 
 app.post('/upload/file', upload.single('file'), (req, res) => {
+    console.log("Uploading file " + req.file.originalname);
     const params = {
         Bucket: FILES_BUCKET,
         Key: req.file.originalname,
@@ -35,6 +36,7 @@ app.post('/upload/file', upload.single('file'), (req, res) => {
 });
 
 app.post('/upload/orders', upload.single('file'), (req, res) => {
+    console.log("Uploading orders " + req.file.originalname);
     if (req.file.mimetype !== 'application/json') {
         return res.status(400).send('Invalid file type. Only JSON files are allowed.');
     }
@@ -57,6 +59,7 @@ app.post('/upload/orders', upload.single('file'), (req, res) => {
 });
 
 app.post('/notifications', (req, res) => {
+    console.log("Sending notification " + JSON.stringify(req.body));
     const params = {
         MessageBody: JSON.stringify(req.body),
         QueueUrl: QUEUE_URL,
@@ -68,13 +71,28 @@ app.post('/notifications', (req, res) => {
 });
 
 app.get('/notifications', (req, res) => {
+    console.log("Receiving notification");
     const params = {
         QueueUrl: QUEUE_URL,
         MaxNumberOfMessages: 1,
     };
     sqs.receiveMessage(params, (err, data) => {
         if (err) return res.status(500).send(err);
-        res.status(200).send(data.Messages ? data.Messages[0] : {});
+
+        let message = {};
+
+        if (data.Messages) {
+            const deleteParams = {
+                QueueUrl: QUEUE_URL,
+                ReceiptHandle: data.Messages[0].ReceiptHandle,
+            };
+            sqs.deleteMessage(deleteParams, (err, data) => {
+                if (err) return res.status(500).send(err);
+                message = JSON.parse(data.Messages[0].Body);
+                return res.status(200).send(message);        
+            });
+        }
+        return res.status(200).send(message);
     });
 });
 

@@ -58,6 +58,12 @@ module "notifications_queue" {
   queue_name = local.vars.notifications_queue_name
 }
 
+module "api_log_group" {
+  source = "./modules/log-group"
+  log_group_name = local.vars.api_log_group_name
+  log_retention_in_days = local.vars.log_retention_in_days
+}
+
 module "api" {
   source = "./modules/api"
   instance_type = local.vars.ec2_instance_type
@@ -77,4 +83,5 @@ module "api" {
   sqs_queue_url = module.notifications_queue.url
   bucket_files = module.files_bucket.bucket_name
   bucket_orders = module.orders_bucket.bucket_name
+  log_group_name = local.vars.api_log_group_name
 }

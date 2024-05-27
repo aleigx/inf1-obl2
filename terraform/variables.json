@@ -18,5 +18,6 @@
     "lambda_function_name": "lambda-inf1-ob2",
     "lambda_handler": "index.handler",
     "lambda_runtime": "nodejs18.x",
-    "log_retention_in_days": 1
+    "log_retention_in_days": 1,
+    "api_log_group_name": "api-inf1-ob2"
 }

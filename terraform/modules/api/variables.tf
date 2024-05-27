@@ -87,3 +87,8 @@ variable "bucket_orders" {
   description = "The name of the orders bucket"
   type        = string
 }
+
+variable "log_group_name" {
+  description = "The name of the log group"
+  type        = string
+}

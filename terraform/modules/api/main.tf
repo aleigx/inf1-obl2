@@ -121,7 +121,7 @@ resource "aws_vpc_endpoint" "ec2messages" {
   subnet_ids = [aws_subnet.ec2_subnets[0].id]
 }
 
-# vpc endpoints for ecr and s3
+# vpc endpoints for ecr
 
 # VPC Endpoint (ecr.dkr)
 resource "aws_vpc_endpoint" "ecr_dkr" {
@@ -160,6 +160,17 @@ resource "aws_vpc_endpoint" "s3" {
 resource "aws_vpc_endpoint" "sqs" {
   vpc_id = aws_vpc.vpc.id
   service_name = "com.amazonaws.${var.region}.sqs"
+  vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
+  security_group_ids = [aws_security_group.vpc_endpoint_security_group.id]
+  subnet_ids = [aws_subnet.ec2_subnets[0].id]
+}
+
+#VPC Endpoint (cloudwatch)
+
+resource "aws_vpc_endpoint" "cloudwatch" {
+  vpc_id = aws_vpc.vpc.id
+  service_name = "com.amazonaws.${var.region}.logs"
   vpc_endpoint_type = "Interface"
   private_dns_enabled = true
   security_group_ids = [aws_security_group.vpc_endpoint_security_group.id]
@@ -230,6 +241,13 @@ resource "aws_iam_role_policy_attachment" "sqs_full_access" {
 
 resource "aws_iam_role_policy_attachment" "s3_full_access" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+  role       = aws_iam_role.ec2_role.name
+}
+
+# CloudWatch Logs Full Access policy
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_full_access" {
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
   role       = aws_iam_role.ec2_role.name
 }
 
@@ -314,7 +332,7 @@ resource "aws_instance" "app" {
               echo "docker pull ${var.repository_url}:latest" >> /etc/deploy.sh
               echo "docker stop \$(docker ps -a -q)" >> /etc/deploy.sh
               echo "docker rm \$(docker ps -a -q)" >> /etc/deploy.sh
-              echo "docker run -d --env-file /etc/environment -p 80:3000 ${var.repository_url}:latest" >> /etc/deploy.sh
+              echo "docker run -d --env-file /etc/environment -p 80:3000 --log-driver=awslogs --log-opt awslogs-region=${var.region} --log-opt awslogs-group=${var.log_group_name} ${var.repository_url}:latest" >> /etc/deploy.sh
           
               chmod +x /etc/deploy.sh
             EOF
