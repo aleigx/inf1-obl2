@@ -23,77 +23,87 @@ app.get('/health', (req, res) => {
 });
 
 app.post('/upload/file', upload.single('file'), (req, res) => {
-    console.log("Uploading file " + req.file.originalname);
-    const params = {
-        Bucket: FILES_BUCKET,
-        Key: req.file.originalname,
-        Body: req.file.buffer,
-    };
-    s3.upload(params, (err, data) => {
-        if (err) return res.status(500).send(err);
-        res.status(200).send(data);
-    });
+    try {
+        console.log("Uploading file " + req.file.originalname);
+        const params = {
+            Bucket: FILES_BUCKET,
+            Key: req.file.originalname,
+            Body: req.file.buffer,
+        };
+        s3.upload(params, (err, data) => {
+            if (err) return res.status(500).send(err);
+            res.status(200).send(data);
+        });    
+    } catch (err) {
+        return res.status(500).send(err);
+    }
 });
 
 app.post('/upload/orders', upload.single('file'), (req, res) => {
-    console.log("Uploading orders " + req.file.originalname);
-    if (req.file.mimetype !== 'application/json') {
-        return res.status(400).send('Invalid file type. Only JSON files are allowed.');
-    }
-
     try {
+        console.log("Uploading orders " + req.file.originalname);
+        if (req.file.mimetype !== 'application/json') {
+            return res.status(400).send('Invalid file type. Only JSON files are allowed.');
+        }
         JSON.parse(req.file.buffer.toString());
+        const params = {
+            Bucket: ORDERS_BUCKET,
+            Key: req.file.originalname,
+            Body: req.file.buffer,
+        };
+        s3.upload(params, (err, data) => {
+            if (err) return res.status(500).send(err);
+            res.status(200).send(data);
+        });
     } catch (err) {
-        return res.status(400).send('Invalid JSON file.');
+        return res.status(500).send(err);
     }
-
-    const params = {
-        Bucket: ORDERS_BUCKET,
-        Key: req.file.originalname,
-        Body: req.file.buffer,
-    };
-    s3.upload(params, (err, data) => {
-        if (err) return res.status(500).send(err);
-        res.status(200).send(data);
-    });
 });
 
 app.post('/notifications', (req, res) => {
-    console.log("Sending notification " + JSON.stringify(req.body));
-    const params = {
-        MessageBody: JSON.stringify(req.body),
-        QueueUrl: QUEUE_URL,
-    };
-    sqs.sendMessage(params, (err, data) => {
-        if (err) return res.status(500).send(err);
-        res.status(200).send(data);
-    });
+    try {
+        console.log("Sending notification " + JSON.stringify(req.body));
+        const params = {
+            MessageBody: JSON.stringify(req.body),
+            QueueUrl: QUEUE_URL,
+        };
+        sqs.sendMessage(params, (err, data) => {
+            if (err) return res.status(500).send(err);
+            res.status(200).send(data);
+        });
+    } catch (err) {
+        return res.status(500).send(err);
+    }
 });
 
 app.get('/notifications', (req, res) => {
-    console.log("Receiving notification");
-    const params = {
-        QueueUrl: QUEUE_URL,
-        MaxNumberOfMessages: 1,
-    };
-    sqs.receiveMessage(params, (err, data) => {
-        if (err) return res.status(500).send(err);
+    try {
+        console.log("Receiving notification");
+        const params = {
+            QueueUrl: QUEUE_URL,
+            MaxNumberOfMessages: 1,
+        };
+        sqs.receiveMessage(params, (err, data) => {
+            if (err) return res.status(500).send(err);
 
-        let message = {};
+            let message = {};
 
-        if (data.Messages) {
-            const deleteParams = {
-                QueueUrl: QUEUE_URL,
-                ReceiptHandle: data.Messages[0].ReceiptHandle,
-            };
-            sqs.deleteMessage(deleteParams, (err, data) => {
-                if (err) return res.status(500).send(err);
-                message = JSON.parse(data.Messages[0].Body);
-                return res.status(200).send(message);        
-            });
-        }
-        return res.status(200).send(message);
-    });
+            if (data.Messages && data.Messages.length > 0) {
+                const deleteParams = {
+                    QueueUrl: QUEUE_URL,
+                    ReceiptHandle: data.Messages[0].ReceiptHandle,
+                };
+                sqs.deleteMessage(deleteParams, (err, data) => {
+                    if (err) return res.status(500).send(err);
+                    message = JSON.parse(data.Messages[0].Body);
+                    return res.status(200).send(message);
+                });
+            }
+            return res.status(200).send(message);
+        });
+    } catch (err) {
+        return res.status(500).send(err);
+    }
 });
 
 const port = 3000;
