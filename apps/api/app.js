@@ -84,22 +84,16 @@ app.get('/notifications', (req, res) => {
             MaxNumberOfMessages: 1,
         };
         sqs.receiveMessage(params, (err, data) => {
+            console.log(data);
             if (err) return res.status(500).send(err);
-
-            let message = {};
-
-            if (data.Messages && data.Messages.length > 0) {
-                const deleteParams = {
-                    QueueUrl: QUEUE_URL,
-                    ReceiptHandle: data.Messages[0].ReceiptHandle,
-                };
-                sqs.deleteMessage(deleteParams, (err, data) => {
-                    if (err) return res.status(500).send(err);
-                    message = JSON.parse(data.Messages[0].Body);
-                    return res.status(200).send(message);
-                });
-            }
-            return res.status(200).send(message);
+            if (!data.Messages || !data.Messages[0]) return res.status(404).send('No messages in the queue');
+            sqs.deleteMessage({
+                QueueUrl: QUEUE_URL,
+                ReceiptHandle: data.Messages[0].ReceiptHandle,
+            }, (err, data) => {
+                if (err) return res.status(500).send(err);
+                res.status(200).send(JSON.parse(data.Messages[0].Body));
+            });
         });
     } catch (err) {
         return res.status(500).send(err);
