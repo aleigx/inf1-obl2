@@ -9,3 +9,7 @@ variable "bucket_arn" {
 variable "bucket_regional_domain_name" {
   description = "The bucket regional domain name of the S3 bucket"
 }
+
+variable "cloudfront_name" {
+  description = "The name of the CloudFront distribution"
+}

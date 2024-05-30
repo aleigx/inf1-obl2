@@ -18,6 +18,7 @@ module "static_site" {
 
 module "cloudfront" {
   source = "./modules/cloudfront"
+  cloudfront_name = local.vars.cloudfront_name
   bucket_name = module.static_site.bucket_name
   bucket_arn = module.static_site.arn
   bucket_regional_domain_name = module.static_site.bucket_regional_domain_name
@@ -84,4 +85,5 @@ module "api" {
   bucket_files = module.files_bucket.bucket_name
   bucket_orders = module.orders_bucket.bucket_name
   log_group_name = local.vars.api_log_group_name
+  api_instance_name = local.vars.api_instance_name
 }

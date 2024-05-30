@@ -312,7 +312,7 @@ resource "aws_instance" "app" {
   vpc_security_group_ids = [aws_security_group.instance_security_group.id, aws_security_group.ec2_lb_security_group.id]
   iam_instance_profile = aws_iam_instance_profile.ec2_instance_profile.name
   tags = {
-    Name = "app"
+    Name = "${var.api_instance_name}-${count.index}"  
   }
 
   user_data = <<-EOF
